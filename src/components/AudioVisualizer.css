@@ -1,0 +1,37 @@
+.audio-visualizer-container {
+  width: 100%;
+  margin-top: 0;
+  padding: 1.35rem 1.25rem 1.55rem;
+  border-radius: 22px;
+  overflow: hidden;
+  background: radial-gradient(circle at 15% 15%, rgba(76, 29, 149, 0.45), rgba(15, 23, 42, 0.96));
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 250px;
+  position: relative;
+  box-shadow: 0 32px 70px rgba(3, 7, 18, 0.7);
+  isolation: isolate;
+}
+
+.audio-visualizer-container::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 21px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.audio-visualizer {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: transparent;
+  filter: drop-shadow(0 0 12px rgba(124, 58, 237, 0.35));
+  position: relative;
+  z-index: 1;
+  border-radius: 16px;
+}

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Decahedron Drone Probability - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .demo-container {
+            background: rgba(15, 23, 42, 0.68);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 45px rgba(7, 12, 25, 0.5);
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: rgba(226, 232, 240, 0.85);
+        }
+        
+        .subtitle {
+            font-size: 0.75rem;
+            color: rgba(148, 163, 184, 0.7);
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.08em;
+        }
+        
+        .top-prediction-banner {
+            padding: 1rem 1.2rem;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(168, 85, 247, 0.15) 100%);
+            border: 2px solid rgba(99, 102, 241, 0.4);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+            margin-bottom: 1.5rem;
+        }
+        
+        .prediction-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(199, 210, 254, 0.8);
+            margin-bottom: 0.4rem;
+        }
+        
+        .prediction-value {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+        }
+        
+        .drone-letter-large {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #c7d2fe;
+            letter-spacing: 0.05em;
+        }
+        
+        .probability-large {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #818cf8;
+        }
+        
+        .canvas-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 1rem 0;
+            margin-bottom: 1.5rem;
+        }
+        
+        canvas {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            aspect-ratio: 1;
+            border-radius: 16px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            background: radial-gradient(
+                circle at center,
+                rgba(15, 23, 42, 0.6) 0%,
+                rgba(7, 12, 25, 0.8) 100%
+            );
+            box-shadow: inset 0 0 30px rgba(99, 102, 241, 0.1),
+                        0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .legend {
+            padding: 1rem;
+            border-radius: 12px;
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+        
+        .legend-note {
+            font-size: 0.75rem;
+            color: rgba(148, 163, 184, 0.75);
+            text-align: center;
+            line-height: 1.4;
+            margin-bottom: 0.75rem;
+        }
+        
+        .legend-colors {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.7rem;
+            color: rgba(148, 163, 184, 0.8);
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+        
+        .info-panel {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(30, 41, 59, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+        
+        .info-panel h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(199, 210, 254, 0.9);
+        }
+        
+        .probabilities-list {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .prob-item {
+            text-align: center;
+            padding: 0.5rem;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
+            border: 1px solid rgba(99, 102, 241, 0.1);
+        }
+        
+        .prob-letter {
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .prob-value {
+            font-size: 0.85rem;
+            color: rgba(148, 163, 184, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>Drone Probability</h1>
+        <p class="subtitle">2D Decahedron Visualization</p>
+        
+        <div id="topPrediction" class="top-prediction-banner" style="display: none;">
+            <div class="prediction-label">Top Prediction</div>
+            <div class="prediction-value">
+                <span class="drone-letter-large" id="topDrone">Drone A</span>
+                <span class="probability-large" id="topProb">85%</span>
+            </div>
+        </div>
+        
+        <div class="canvas-wrapper">
+            <canvas id="decahedronCanvas"></canvas>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-note">
+                Each face represents a drone (A-J). Face size and color indicate probability confidence.
+            </div>
+            <div class="legend-colors">
+                <div class="legend-item">
+                    <span class="legend-color" style="background: rgba(148, 163, 184, 0.3);"></span>
+                    <span>0%</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: rgba(250, 204, 21, 0.6);"></span>
+                    <span>&lt;25%</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: rgba(251, 146, 60, 0.7);"></span>
+                    <span>25-50%</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: rgba(59, 130, 246, 0.8);"></span>
+                    <span>50-75%</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: rgba(34, 211, 153, 0.9);"></span>
+                    <span>&gt;75%</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>All Probabilities</h3>
+            <div class="probabilities-list" id="probList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Random probabilities for demo
+        const droneLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+        const mockProbabilities = {}
+        
+        // Generate random probabilities that sum to ~100
+        let total = 0
+        droneLetters.forEach(letter => {
+            const prob = Math.random() * 30 // Random between 0-30
+            mockProbabilities[letter] = Math.round(prob * 10) / 10
+            total += mockProbabilities[letter]
+        })
+        
+        // Normalize to make top one more prominent
+        const maxProb = Math.max(...Object.values(mockProbabilities))
+        const maxIndex = Object.values(mockProbabilities).indexOf(maxProb)
+        const topLetter = droneLetters[maxIndex]
+        
+        // Make top prediction more prominent (60-90%)
+        mockProbabilities[topLetter] = Math.round((60 + Math.random() * 30) * 10) / 10
+        
+        // Redistribute remaining
+        const remaining = 100 - mockProbabilities[topLetter]
+        const otherTotal = Object.values(mockProbabilities).reduce((sum, val, idx) => 
+            idx === maxIndex ? sum : sum + val, 0)
+        
+        droneLetters.forEach((letter, idx) => {
+            if (idx !== maxIndex) {
+                mockProbabilities[letter] = Math.round((mockProbabilities[letter] / otherTotal * remaining) * 10) / 10
+            }
+        })
+        
+        // Ensure all are positive and sum is close to 100
+        let finalSum = Object.values(mockProbabilities).reduce((a, b) => a + b, 0)
+        const diff = 100 - finalSum
+        mockProbabilities[topLetter] = Math.round((mockProbabilities[topLetter] + diff) * 10) / 10
+        
+        // Find top prediction
+        let topProb = -1
+        let topDrone = null
+        Object.entries(mockProbabilities).forEach(([letter, prob]) => {
+            if (prob > topProb) {
+                topProb = prob
+                topDrone = letter
+            }
+        })
+        
+        // Update top prediction banner
+        if (topDrone && topProb > 0) {
+            document.getElementById('topPrediction').style.display = 'block'
+            document.getElementById('topDrone').textContent = `Drone ${topDrone}`
+            document.getElementById('topProb').textContent = `${Math.round(topProb)}%`
+        }
+        
+        // Update probabilities list
+        const probList = document.getElementById('probList')
+        droneLetters.forEach(letter => {
+            const prob = mockProbabilities[letter] || 0
+            const item = document.createElement('div')
+            item.className = 'prob-item'
+            item.innerHTML = `
+                <div class="prob-letter">${letter}</div>
+                <div class="prob-value">${Math.round(prob)}%</div>
+            `
+            probList.appendChild(item)
+        })
+        
+        // Draw decahedron
+        const canvas = document.getElementById('decahedronCanvas')
+        const ctx = canvas.getContext('2d')
+        const size = Math.min(canvas.parentElement.clientWidth - 40, 500)
+        canvas.width = size
+        canvas.height = size
+        
+        const centerX = canvas.width / 2
+        const centerY = canvas.height / 2
+        const radius = Math.min(canvas.width, canvas.height) * 0.35
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.3)'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        
+        // Draw 2D decagon
+        const numSides = 10
+        const angleStep = (2 * Math.PI) / numSides
+        const startAngle = -Math.PI / 2
+        
+        // Calculate vertices
+        const vertices = []
+        for (let i = 0; i < numSides; i++) {
+            const angle = startAngle + (i * angleStep)
+            const x = centerX + radius * Math.cos(angle)
+            const y = centerY + radius * Math.sin(angle)
+            vertices.push({ x, y, angle })
+        }
+        
+        // Draw each face
+        droneLetters.forEach((letter, index) => {
+            const probability = mockProbabilities[letter] || 0
+            const isTopPrediction = topDrone === letter && probability > 0
+            
+            const v1 = vertices[index]
+            const v2 = vertices[(index + 1) % numSides]
+            
+            const faceCenterX = (v1.x + v2.x + centerX) / 3
+            const faceCenterY = (v1.y + v2.y + centerY) / 3
+            
+            // Scale face based on probability
+            const scaleFactor = 0.3 + (probability / 100) * 0.7
+            const scaledRadius = radius * scaleFactor
+            
+            const angle1 = startAngle + (index * angleStep)
+            const angle2 = startAngle + ((index + 1) % numSides) * angleStep
+            
+            const scaledV1 = {
+                x: centerX + scaledRadius * Math.cos(angle1),
+                y: centerY + scaledRadius * Math.sin(angle1)
+            }
+            const scaledV2 = {
+                x: centerX + scaledRadius * Math.cos(angle2),
+                y: centerY + scaledRadius * Math.sin(angle2)
+            }
+            
+            // Get colors
+            let fillColor, strokeColor, textColor
+            if (probability === 0) {
+                fillColor = 'rgba(148, 163, 184, 0.15)'
+                strokeColor = 'rgba(148, 163, 184, 0.3)'
+                textColor = 'rgba(148, 163, 184, 0.5)'
+            } else if (probability < 25) {
+                fillColor = 'rgba(250, 204, 21, 0.4)'
+                strokeColor = 'rgba(250, 204, 21, 0.7)'
+                textColor = '#facc15'
+            } else if (probability < 50) {
+                fillColor = 'rgba(251, 146, 60, 0.5)'
+                strokeColor = 'rgba(251, 146, 60, 0.8)'
+                textColor = '#fb923c'
+            } else if (probability < 75) {
+                fillColor = 'rgba(59, 130, 246, 0.5)'
+                strokeColor = 'rgba(59, 130, 246, 0.8)'
+                textColor = '#60a5fa'
+            } else {
+                fillColor = 'rgba(34, 211, 153, 0.6)'
+                strokeColor = 'rgba(34, 211, 153, 0.9)'
+                textColor = '#34d399'
+            }
+            
+            if (isTopPrediction) {
+                strokeColor = 'rgba(99, 102, 241, 1)'
+                ctx.shadowBlur = 15
+                ctx.shadowColor = 'rgba(99, 102, 241, 0.6)'
+            } else {
+                ctx.shadowBlur = 0
+            }
+            
+            // Draw face
+            ctx.beginPath()
+            ctx.moveTo(centerX, centerY)
+            ctx.lineTo(scaledV1.x, scaledV1.y)
+            ctx.lineTo(scaledV2.x, scaledV2.y)
+            ctx.closePath()
+            
+            ctx.fillStyle = fillColor
+            ctx.fill()
+            ctx.strokeStyle = strokeColor
+            ctx.lineWidth = isTopPrediction ? 3 : 2
+            ctx.stroke()
+            
+            // Draw outer edge
+            ctx.beginPath()
+            ctx.moveTo(scaledV1.x, scaledV1.y)
+            ctx.lineTo(scaledV2.x, scaledV2.y)
+            ctx.strokeStyle = strokeColor
+            ctx.lineWidth = isTopPrediction ? 3 : 2
+            ctx.stroke()
+            
+            // Draw label
+            const labelRadius = radius * 0.75
+            const labelAngle = startAngle + (index + 0.5) * angleStep
+            const labelX = centerX + labelRadius * Math.cos(labelAngle)
+            const labelY = centerY + labelRadius * Math.sin(labelAngle)
+            
+            ctx.fillStyle = textColor
+            ctx.font = 'bold 18px sans-serif'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(`Drone ${letter}`, labelX, labelY - 10)
+            
+            ctx.fillStyle = textColor
+            ctx.font = 'bold 14px sans-serif'
+            ctx.fillText(`${Math.round(probability)}%`, labelX, labelY + 10)
+            
+            // Top prediction badge
+            if (isTopPrediction) {
+                ctx.fillStyle = 'rgba(99, 102, 241, 0.9)'
+                ctx.beginPath()
+                ctx.arc(labelX, labelY - 25, 8, 0, 2 * Math.PI)
+                ctx.fill()
+                ctx.fillStyle = '#ffffff'
+                ctx.font = 'bold 10px sans-serif'
+                ctx.fillText('★', labelX, labelY - 23)
+            }
+        })
+        
+        // Draw center circle
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, radius * 0.15, 0, 2 * Math.PI)
+        ctx.fillStyle = 'rgba(99, 102, 241, 0.3)'
+        ctx.fill()
+        ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)'
+        ctx.lineWidth = 2
+        ctx.stroke()
+    </script>
+</body>
+</html>
+

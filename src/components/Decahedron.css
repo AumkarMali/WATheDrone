@@ -1,0 +1,239 @@
+.decahedron-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  padding: 1.8rem;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.85) 0%,
+    rgba(30, 41, 59, 0.75) 50%,
+    rgba(15, 23, 42, 0.85) 100%
+  );
+  box-shadow: 
+    0 20px 45px rgba(7, 12, 25, 0.5),
+    inset 0 0 60px rgba(99, 102, 241, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.decahedron-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.15) 0%,
+    rgba(168, 85, 247, 0.1) 30%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.decahedron-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+.decahedron-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.decahedron-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.decahedron-subtitle {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.7);
+  letter-spacing: 0.08em;
+}
+
+/* Top Prediction Banner */
+.top-prediction-banner {
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.25) 0%,
+    rgba(168, 85, 247, 0.2) 50%,
+    rgba(99, 102, 241, 0.25) 100%
+  );
+  border: 2px solid rgba(99, 102, 241, 0.5);
+  box-shadow: 
+    0 0 25px rgba(99, 102, 241, 0.3),
+    inset 0 0 20px rgba(99, 102, 241, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.top-prediction-banner::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.3) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.top-prediction-banner > * {
+  position: relative;
+  z-index: 1;
+}
+
+.prediction-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(199, 210, 254, 0.8);
+  margin-bottom: 0.4rem;
+}
+
+.prediction-value {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.drone-letter-large {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #c7d2fe;
+  letter-spacing: 0.05em;
+}
+
+.probability-large {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #818cf8;
+}
+
+/* Canvas Wrapper */
+.canvas-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 2rem 0;
+  overflow: visible;
+}
+
+.decahedron-canvas {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: 
+    radial-gradient(
+      circle at 30% 30%,
+      rgba(99, 102, 241, 0.2) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 70% 70%,
+      rgba(168, 85, 247, 0.15) 0%,
+      transparent 50%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.7) 0%,
+      rgba(7, 12, 25, 0.9) 100%
+    );
+  box-shadow: 
+    inset 0 0 40px rgba(99, 102, 241, 0.15),
+    inset 0 0 80px rgba(168, 85, 247, 0.08),
+    0 10px 30px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(99, 102, 241, 0.1);
+}
+
+.decahedron-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    rgba(30, 41, 59, 0.5) 0%,
+    rgba(15, 23, 42, 0.4) 100%
+  );
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  box-shadow: inset 0 0 20px rgba(99, 102, 241, 0.05);
+}
+
+.legend-note {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.75);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.legend-colors {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .decahedron-container {
+    padding: 1.4rem;
+  }
+
+  .decahedron-canvas {
+    max-width: 100%;
+  }
+
+  .drone-letter-large {
+    font-size: 1.1rem;
+  }
+
+  .probability-large {
+    font-size: 1.5rem;
+  }
+
+  .legend-colors {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+}

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decahedron Drone Probability Visualization - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .demo-container {
+            background: rgba(15, 23, 42, 0.68);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 45px rgba(7, 12, 25, 0.5);
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+        
+        .subtitle {
+            font-size: 0.85rem;
+            color: rgba(148, 163, 184, 0.7);
+            margin-bottom: 2rem;
+        }
+        
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            margin: 1rem 0;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            background: radial-gradient(
+                circle at 30% 40%,
+                rgba(99, 102, 241, 0.08) 0%,
+                rgba(15, 23, 42, 0.4) 100%
+            );
+        }
+        
+        .info-panel {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(30, 41, 59, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+        
+        .info-panel h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(199, 210, 254, 0.9);
+        }
+        
+        .probabilities-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .prob-item {
+            text-align: center;
+            padding: 0.5rem;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
+            border: 1px solid rgba(99, 102, 241, 0.1);
+        }
+        
+        .prob-letter {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .prob-value {
+            font-size: 0.85rem;
+            color: rgba(148, 163, 184, 0.8);
+        }
+        
+        .description {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: rgba(203, 213, 225, 0.85);
+        }
+        
+        .highlight {
+            color: #c7d2fe;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>Drone Probability Visualization</h1>
+        <p class="subtitle">Interactive 3D Decahedron Model</p>
+        
+        <div class="canvas-container">
+            <canvas id="decahedronCanvas"></canvas>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Current Probabilities</h3>
+            <div class="probabilities-grid" id="probGrid"></div>
+            <div class="description">
+                <p><span class="highlight">How it works:</span></p>
+                <p>• Each face of the decahedron represents a drone (A through J)</p>
+                <p>• Face <span class="highlight">brightness</span> indicates confidence level (brighter = higher probability)</p>
+                <p>• Face <span class="highlight">color</span> varies by drone (hue shifts for each drone)</p>
+                <p>• The 3D model <span class="highlight">rotates continuously</span> to show all faces</p>
+                <p>• Each face displays the drone letter and probability percentage</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock probabilities - simulating ML model output
+        const mockProbabilities = {
+            A: 85,  // High confidence
+            B: 12,  // Low
+            C: 2,   // Very low
+            D: 0,   // None
+            E: 0,   // None
+            F: 1,   // Very low
+            G: 0,   // None
+            H: 0,   // None
+            I: 0,   // None
+            J: 0    // None
+        };
+
+        const canvas = document.getElementById('decahedronCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas size
+        const size = Math.min(canvas.parentElement.clientWidth, 500);
+        canvas.width = size;
+        canvas.height = size;
+        
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        // Decahedron vertices
+        const vertices = [
+            [1, 1, 1], [1, -1, 1], [-1, -1, 1], [-1, 1, 1],
+            [0, 1.618, 0.618], [0, 1.618, -0.618],
+            [0.618, 0.618, 1.618], [-0.618, 0.618, 1.618],
+            [1.618, 0.618, 0], [1.618, -0.618, 0],
+            [0.618, -0.618, 1.618], [-0.618, -0.618, 1.618],
+            [0.618, 1.618, 0], [-0.618, 1.618, 0],
+            [1.618, 0, 0.618], [0.618, 0, 1.618],
+            [-0.618, 0, 1.618], [-1.618, 0.618, 0],
+            [-1.618, -0.618, 0], [-0.618, -1.618, 0],
+        ];
+        
+        const faceIndices = [
+            [0, 1, 6, 15], [1, 10, 15, 6], [2, 11, 16, 7],
+            [3, 7, 16, 17], [4, 12, 5, 13], [6, 8, 14, 15],
+            [10, 11, 19, 9], [17, 18, 19, 11], [4, 6, 7, 13],
+            [8, 9, 14, 18]
+        ];
+        
+        const droneLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+        
+        let rotation = { x: 0.5, y: 0.5 };
+        
+        function project(point, scale = 100, z = 5) {
+            const x = (point[0] * scale) / (z + point[2]);
+            const y = (point[1] * scale) / (z + point[2]);
+            return [x, y];
+        }
+        
+        function rotateX(point, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return [
+                point[0],
+                point[1] * cos - point[2] * sin,
+                point[1] * sin + point[2] * cos,
+            ];
+        }
+        
+        function rotateY(point, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return [
+                point[0] * cos + point[2] * sin,
+                point[1],
+                -point[0] * sin + point[2] * cos,
+            ];
+        }
+        
+        function getFaceCenter(faceVertices) {
+            const center = [0, 0, 0];
+            faceVertices.forEach(vertex => {
+                center[0] += vertex[0];
+                center[1] += vertex[1];
+                center[2] += vertex[2];
+            });
+            return [
+                center[0] / faceVertices.length,
+                center[1] / faceVertices.length,
+                center[2] / faceVertices.length
+            ];
+        }
+        
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Rotate vertices
+            const rotatedVertices = vertices.map(v => {
+                let point = [...v];
+                point = rotateX(point, rotation.x);
+                point = rotateY(point, rotation.y);
+                return point;
+            });
+            
+            // Create faces
+            const faces = faceIndices.map((indices, faceIdx) => {
+                const faceVertices = indices.map(i => rotatedVertices[i]);
+                const center = getFaceCenter(faceVertices);
+                const projectedPoints = faceVertices.map(v => project(v, 100, 5));
+                const droneLetter = droneLetters[faceIdx];
+                const probability = mockProbabilities[droneLetter] || 0;
+                
+                return {
+                    projectedPoints,
+                    avgZ: center[2],
+                    droneLetter,
+                    probability
+                };
+            });
+            
+            // Sort by depth
+            faces.sort((a, b) => a.avgZ - b.avgZ);
+            
+            // Draw faces
+            faces.forEach(({ projectedPoints, droneLetter, probability }) => {
+                const intensity = Math.max(0.2, probability / 100);
+                const hue = (droneLetters.indexOf(droneLetter) * 36) % 360;
+                const saturation = 70;
+                const lightness = 40 + intensity * 20;
+                
+                ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                ctx.strokeStyle = `hsl(${hue}, ${saturation}%, ${lightness + 20}%)`;
+                ctx.lineWidth = 2;
+                
+                // Draw polygon
+                ctx.beginPath();
+                ctx.moveTo(projectedPoints[0][0] + centerX, projectedPoints[0][1] + centerY);
+                for (let i = 1; i < projectedPoints.length; i++) {
+                    ctx.lineTo(
+                        projectedPoints[i][0] + centerX,
+                        projectedPoints[i][1] + centerY
+                    );
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                // Draw text
+                const textX = projectedPoints.reduce((sum, p) => sum + p[0], 0) / projectedPoints.length + centerX;
+                const textY = projectedPoints.reduce((sum, p) => sum + p[1], 0) / projectedPoints.length + centerY;
+                
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(droneLetter, textX, textY - 8);
+                
+                ctx.fillStyle = 'rgba(248, 250, 252, 0.8)';
+                ctx.font = '10px sans-serif';
+                ctx.fillText(`${Math.round(probability)}%`, textX, textY + 6);
+            });
+            
+            // Update rotation
+            rotation.x += 0.002;
+            rotation.y += 0.003;
+        }
+        
+        // Animation loop
+        function animate() {
+            draw();
+            requestAnimationFrame(animate);
+        }
+        
+        // Update probability grid
+        function updateProbGrid() {
+            const grid = document.getElementById('probGrid');
+            grid.innerHTML = '';
+            droneLetters.forEach(letter => {
+                const prob = mockProbabilities[letter] || 0;
+                const item = document.createElement('div');
+                item.className = 'prob-item';
+                item.innerHTML = `
+                    <div class="prob-letter">${letter}</div>
+                    <div class="prob-value">${prob}%</div>
+                `;
+                grid.appendChild(item);
+            });
+        }
+        
+        // Start animation
+        updateProbGrid();
+        animate();
+    </script>
+</body>
+</html>
+
