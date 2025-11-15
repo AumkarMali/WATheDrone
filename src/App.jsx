@@ -861,7 +861,7 @@ function App() {
             {/* Waveform Section */}
             <section className="visualization-section">
               <div className="section-header">
-                <h2 className="section-title">Waveform</h2>
+                <h2 className="section-title">Audio Analysis</h2>
               </div>
               {audioUrl ? (
                 <div className="waveform-group">

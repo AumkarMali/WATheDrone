@@ -151,7 +151,7 @@ function AudioVisualizer({ audioUrl }) {
     const drawBars = () => {
       repaintBackground()
 
-      const paddingX = Math.max(28, canvas.width * 0.14)
+      const paddingX = 5 //Math.max(28, canvas.width * 0.14)
       const baseY = canvas.height * 0.94
       const maxHeight = canvas.height * 0.82
       const availableWidth = Math.max(40, canvas.width - paddingX * 2)
@@ -159,13 +159,15 @@ function AudioVisualizer({ audioUrl }) {
       const usableWidth = Math.max(20, availableWidth - gap * (BAR_COUNT - 1))
       const barWidth = Math.max(5, usableWidth / BAR_COUNT)
       const radius = Math.min(8, barWidth / 2)
+      const totalBarsWidth = BAR_COUNT * barWidth + gap * (BAR_COUNT - 1)
+      const startX = Math.max(paddingX, (canvas.width - totalBarsWidth) / 2)
 
       ctx.save()
       ctx.shadowColor = 'rgba(99, 102, 241, 0.35)'
       ctx.shadowBlur = 12
       for (let i = 0; i < BAR_COUNT; i += 1) {
         const height = Math.max(4, barLevelsRef.current[i] * maxHeight)
-        const x = paddingX + i * (barWidth + gap)
+        const x = startX + i * (barWidth + gap)
         const y = baseY - height
 
         const gradient = ctx.createLinearGradient(x, y, x, baseY)
