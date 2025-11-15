@@ -22,10 +22,10 @@ CORS(app,
      supports_credentials=False,
      max_age=3600)
 
-# Model loading - lazy load to avoid startup crashes
-MODEL_NAME = "preszzz/drone-audio-detection-05-17-trial-0"
-extractor = None
-model = None
+# MVHST Model loading - lazy load to avoid startup crashes
+mvhst_model = None
+feature_extractors = None
+class_mapping = None
 _model_loading = False
 _model_load_error = None
 
@@ -36,10 +36,10 @@ _umx_model_load_error = None
 
 
 def load_model():
-    """Lazy load the drone detection model"""
-    global extractor, model, _model_loading, _model_load_error
+    """Lazy load the MVHST drone detection model"""
+    global mvhst_model, feature_extractors, class_mapping, _model_loading, _model_load_error
 
-    if model is not None and extractor is not None:
+    if mvhst_model is not None and feature_extractors is not None:
         return True  # Already loaded
 
     if _model_loading:
@@ -50,44 +50,100 @@ def load_model():
 
     try:
         _model_loading = True
+        print("Loading MVHST model...")
 
         # Import here to avoid startup crashes
-        import librosa
-        import torch
-        import numpy as np
-        from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
+        from pathlib import Path
+        import config
+        from models.fusion_model import MVHSTModel
+        from features.mel_extractor import MelSpectrogramExtractor
+        from features.cqt_extractor import CQTExtractor
+        from features.harmonic_features import HarmonicFeatureExtractor
+        from utils.helper import get_device, load_class_mapping
 
-        # Set torch to use less memory
-        torch.set_num_threads(1)
+        # Get device
+        device = get_device()
+        print(f"Using device: {device}")
 
-        # Load model with memory optimizations
-        extractor = AutoFeatureExtractor.from_pretrained(MODEL_NAME)
-        model = AutoModelForAudioClassification.from_pretrained(
-            MODEL_NAME,
-            torch_dtype=torch.float32,  # Use float32 instead of float16 to avoid issues
-            low_cpu_mem_usage=True  # Optimize memory usage during loading
-        )
+        # Load class mapping
+        class_mapping_path = Path(config.LOG_DIR) / 'class_mapping.json'
+        if not class_mapping_path.exists():
+            raise FileNotFoundError(f"Class mapping not found at {class_mapping_path}. Please train the model first.")
 
-        # Set model to eval mode and move to CPU explicitly
-        model.eval()
-        model = model.cpu()
+        class_mapping = load_class_mapping(str(class_mapping_path))
+        num_classes = len(class_mapping)
+        print(f"Loaded {num_classes} classes: {list(class_mapping.keys())}")
+
+        # Initialize feature extractors
+        print("Initializing feature extractors...")
+        feature_extractors = {
+            'mel': MelSpectrogramExtractor(
+                sample_rate=config.SAMPLE_RATE,
+                n_fft=config.MEL_N_FFT,
+                hop_length=config.MEL_HOP_LENGTH,
+                n_mels=config.MEL_N_MELS,
+                fmin=config.MEL_FMIN,
+                fmax=config.MEL_FMAX
+            ).to(device).eval(),
+            'cqt': CQTExtractor(
+                sample_rate=config.SAMPLE_RATE,
+                hop_length=config.CQT_HOP_LENGTH,
+                bins_per_octave=config.CQT_BINS_PER_OCTAVE,
+                n_bins=config.CQT_N_BINS,
+                fmin=config.CQT_FMIN
+            ).to(device).eval(),
+            'harmonic': HarmonicFeatureExtractor(
+                sample_rate=config.SAMPLE_RATE,
+                n_fft=config.HARMONIC_N_FFT,
+                hop_length=config.HARMONIC_HOP_LENGTH,
+                n_harmonics=config.HARMONIC_N_HARMONICS
+            ).to(device).eval()
+        }
+
+        # Initialize model
+        print("Initializing MVHST model...")
+        mvhst_model = MVHSTModel(
+            num_classes=num_classes,
+            d_model=config.D_MODEL,
+            nhead=config.NHEAD,
+            num_layers=config.NUM_LAYERS,
+            dim_feedforward=config.DIM_FEEDFORWARD,
+            dropout=config.DROPOUT,
+            mel_freq_bins=config.MEL_N_MELS,
+            cqt_freq_bins=config.CQT_N_BINS,
+            harmonic_bins=config.HARMONIC_N_HARMONICS
+        ).to(device)
+
+        # Load trained model
+        checkpoint_path = Path(config.CHECKPOINT_DIR) / 'best_model.pt'
+        if checkpoint_path.exists():
+            print(f"Loading trained model from {checkpoint_path}...")
+            checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+            mvhst_model.load_state_dict(checkpoint['model_state_dict'], strict=True)
+            mvhst_model.eval()
+            print(f"Model loaded from epoch {checkpoint['epoch']}")
+        else:
+            print("Warning: No trained model found. Using randomly initialized weights.")
+            mvhst_model.eval()
 
         # Disable gradient computation globally
-        for param in model.parameters():
+        for param in mvhst_model.parameters():
             param.requires_grad = False
 
         _model_loading = False
+        print("MVHST model loaded successfully!")
         return True
 
     except Exception as e:
-        error_msg = f"Error loading model: {str(e)}"
+        error_msg = f"Error loading MVHST model: {str(e)}"
         print(error_msg)
         import traceback
         traceback.print_exc()
         _model_load_error = error_msg
         _model_loading = False
-        extractor = None
-        model = None
+        mvhst_model = None
+        feature_extractors = None
+        class_mapping = None
         return False
 
 
@@ -131,62 +187,133 @@ def safe_delete_file(filepath, max_retries=10, retry_delay=0.2):
 
 
 def predict_drone(audio_path):
-    """Predict if audio contains a drone"""
-    global _model_load_error
+    """Predict drone class using MVHST model"""
+    global _model_load_error, mvhst_model, feature_extractors, class_mapping
+
     # Try to load model if not loaded
     if not load_model():
         error_msg = _model_load_error or "Model not loaded"
         return None, None, None, error_msg
 
     try:
-        # Import here to avoid import errors if model loading failed
-        import librosa
+        import torchaudio
         import torch
         import gc
+        from pathlib import Path
+        import config
+        from utils.helper import get_device
 
-        # Set torch to use less memory
-        torch.set_num_threads(1)  # Use single thread to reduce memory
+        device = get_device()
 
-        # Load audio at the model's expected SR (16 kHz)
-        # Limit audio length to reduce memory usage (max 10 seconds)
-        audio, sr = librosa.load(audio_path, sr=16000, mono=True, duration=10.0)
+        # Load audio file with fallback backends
+        waveform = None
+        sr = None
+        try:
+            waveform, sr = torchaudio.load(str(audio_path), backend='soundfile')
+        except (RuntimeError, Exception):
+            try:
+                waveform, sr = torchaudio.load(str(audio_path), backend='sox')
+            except (RuntimeError, Exception):
+                # Fallback to librosa
+                audio_data, sr = librosa.load(str(audio_path), sr=config.SAMPLE_RATE, mono=True)
+                waveform = torch.from_numpy(audio_data).unsqueeze(0)
 
-        # Convert audio to HF input format
-        inputs = extractor(
-            audio,
-            sampling_rate=16000,
-            return_tensors="pt"
-        )
+        if waveform is None:
+            raise RuntimeError("Failed to load audio file with any backend")
 
-        # Move inputs to CPU explicitly (model should already be on CPU)
-        inputs = {k: v.cpu() if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
+        # Convert to mono if stereo
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
 
-        # Run inference with memory optimizations
+        # Resample if needed
+        if sr != config.SAMPLE_RATE:
+            resampler = torchaudio.transforms.Resample(sr, config.SAMPLE_RATE)
+            waveform = resampler(waveform)
+
+        # Trim or pad to target length
+        target_length = int(config.SAMPLE_RATE * config.DURATION)
+        current_length = waveform.shape[-1]
+
+        if current_length > target_length:
+            # Take center portion
+            start = (current_length - target_length) // 2
+            waveform = waveform[:, start:start + target_length]
+        elif current_length < target_length:
+            # Pad with zeros
+            padding = target_length - current_length
+            waveform = torch.nn.functional.pad(waveform, (0, padding))
+
+        # Move to device and ensure batch dimension
+        audio = waveform.to(device)  # Keep as (1, samples) for batch processing
+
+        # Extract features
         with torch.no_grad():
-            # Set model to eval mode and disable gradient tracking
-            model.eval()
-            logits = model(**inputs).logits
+            mvhst_model.eval()
+            mel_features = feature_extractors['mel'](audio)
+            cqt_features = feature_extractors['cqt'](audio)
+            harmonic_features = feature_extractors['harmonic'](audio)
 
-        # Convert to probabilities
-        probs = torch.softmax(logits, dim=-1)[0]
+            # Ensure all features have batch dimension (batch, freq_bins, time)
+            if mel_features.dim() == 2:
+                mel_features = mel_features.unsqueeze(0)
+            if cqt_features.dim() == 2:
+                cqt_features = cqt_features.unsqueeze(0)
+            if harmonic_features.dim() == 2:
+                harmonic_features = harmonic_features.unsqueeze(0)
 
-        # Get predicted class
-        pred_id = int(torch.argmax(probs))
-        label = model.config.id2label[pred_id]
-        confidence = float(probs[pred_id])
+            # Debug: print shapes to verify
+            print(
+                f"Feature shapes - Mel: {mel_features.shape}, CQT: {cqt_features.shape}, Harmonic: {harmonic_features.shape}")
 
-        # Get all probabilities for all classes
-        all_probabilities = {}
-        for class_id in range(len(model.config.id2label)):
-            class_label = model.config.id2label[class_id]
-            all_probabilities[class_label] = float(probs[class_id])
+            # Forward pass
+            logits = mvhst_model(mel_features, cqt_features, harmonic_features)
+
+            # Convert to probabilities
+            probabilities = torch.softmax(logits, dim=1)[0]
+
+            # Get predicted class
+            predicted_class_idx = torch.argmax(probabilities, dim=0).item()
+            confidence = float(probabilities[predicted_class_idx].item())
+
+            # Get class name
+            idx_to_class = {v: k for k, v in class_mapping.items()}
+            predicted_class = idx_to_class[predicted_class_idx]
+
+            # Get all probabilities for all classes (as percentages 0-100)
+            all_probabilities = {}
+            prob_list = []
+            for class_id in range(len(class_mapping)):
+                class_name = idx_to_class[class_id]
+                # Convert to percentage (0-100)
+                prob_value = float(probabilities[class_id].item()) * 100.0
+                all_probabilities[class_name] = round(prob_value, 2)
+                prob_list.append((class_name, round(prob_value, 2)))
+                # Also add short form (A, B, C, etc.) for frontend compatibility
+                if class_name.startswith('drone_'):
+                    short_name = class_name.replace('drone_', '')
+                    all_probabilities[short_name] = round(prob_value, 2)
+
+            # Print all predictions sorted by probability
+            print("\n" + "=" * 60)
+            print("PREDICTION RESULTS")
+            print("=" * 60)
+            print(f"Predicted Class: {predicted_class}")
+            print(f"Confidence: {confidence * 100:.2f}%")
+            print("\nAll Predictions (sorted by probability):")
+            print("-" * 60)
+            # Sort by probability (descending)
+            prob_list.sort(key=lambda x: x[1], reverse=True)
+            for rank, (class_name, prob) in enumerate(prob_list, 1):
+                marker = ">>>" if class_name == predicted_class else "   "
+                print(f"{marker} {rank:2d}. {class_name:<15} {prob:>6.2f}%")
+            print("=" * 60 + "\n")
 
         # Clear cache and free memory
-        del inputs, logits, probs, audio
+        del audio, mel_features, cqt_features, harmonic_features, logits, probabilities, waveform
         torch.cuda.empty_cache() if torch.cuda.is_available() else None
         gc.collect()
 
-        return label, confidence, all_probabilities, None
+        return predicted_class, confidence, all_probabilities, None
 
     except Exception as e:
         import traceback
@@ -200,14 +327,14 @@ def predict_drone(audio_path):
 @app.route('/', methods=['GET', 'OPTIONS'])
 def home():
     """Health check endpoint"""
-    global model, extractor, _model_load_error
-    model_status = "loaded" if (model is not None and extractor is not None) else "not loaded"
+    global mvhst_model, feature_extractors, _model_load_error
+    model_status = "loaded" if (mvhst_model is not None and feature_extractors is not None) else "not loaded"
     if _model_load_error:
         model_status = f"error: {_model_load_error[:100]}"  # Truncate long errors
 
     return jsonify({
         'status': 'success',
-        'message': 'MP3 Upload Server is running',
+        'message': 'MVHST Drone Detection Server is running',
         'model_status': model_status,
         'timestamp': datetime.utcnow().isoformat(),
         'cors_enabled': True
@@ -280,8 +407,9 @@ def upload_file():
             # Load audio file
             audio = AudioSegment.from_file(temp_filepath)
 
-            # Convert to WAV: 16kHz, mono channel (standard for ML)
-            audio.set_frame_rate(16000).set_channels(1).export(wav_filepath, format="wav")
+            # Convert to WAV: 22050Hz (MVHST sample rate), mono channel
+            import config as mv_config
+            audio.set_frame_rate(mv_config.SAMPLE_RATE).set_channels(1).export(wav_filepath, format="wav")
 
             # Explicitly delete audio object to release file handles
             del audio
@@ -299,7 +427,8 @@ def upload_file():
             prediction_error = None
 
             try:
-                prediction_label, prediction_confidence, all_probabilities, prediction_error = predict_drone(wav_filepath)
+                prediction_label, prediction_confidence, all_probabilities, prediction_error = predict_drone(
+                    wav_filepath)
             except Exception as pred_error:
                 print(f"Prediction error: {str(pred_error)}")
                 prediction_error = str(pred_error)
@@ -325,11 +454,9 @@ def upload_file():
                     'label': prediction_label,
                     'confidence': round(prediction_confidence * 100, 2)  # Convert to percentage
                 }
-                # Add all probabilities if available
+                # Add all probabilities if available (already in percentage format from predict_drone)
                 if all_probabilities is not None:
-                    response_data['prediction']['probabilities'] = {
-                        label: round(prob * 100, 2) for label, prob in all_probabilities.items()
-                    }
+                    response_data['prediction']['probabilities'] = all_probabilities
             elif prediction_error:
                 response_data['prediction_error'] = prediction_error
 
